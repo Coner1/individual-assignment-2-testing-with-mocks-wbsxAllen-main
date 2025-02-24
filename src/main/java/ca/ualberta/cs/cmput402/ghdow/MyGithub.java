@@ -4,6 +4,7 @@ import java.io.IOException;
 
 import org.kohsuke.github.*;
 
+import java.text.DateFormatSymbols;
 import java.util.*;
 
 public class MyGithub {
@@ -104,5 +105,105 @@ public class MyGithub {
             }
         return result;
     }
-}
 
+    /**
+     * #2: Most popular commit month.
+     * @return
+     * @throws IOException
+     */
+    public String getMostPopularMonth() throws IOException {
+        int[] months = new int[13]; // 1-12 for months, 0 unused
+        Calendar cal = Calendar.getInstance();
+        for (GHCommit commit : getCommits()) {
+            cal.setTime(commit.getCommitDate());
+            int month = cal.get(Calendar.MONTH) + 1; // 0-based to 1-based
+            months[month]++;
+        }
+        int maxMonth = argMax(months);
+        return new DateFormatSymbols().getMonths()[maxMonth - 1]; // Convert to month name
+    }
+
+    /**
+     * #3: Average Time Between Commits on a Repository
+     * @param repoName
+     * @return
+     * @throws IOException
+     */
+    public double getAverageCommitInterval(String repoName) throws IOException {
+        GHRepository repo = myRepos.get(repoName);
+        if (repo == null) {
+            throw new IllegalArgumentException("Repository not found: " + repoName);
+        }
+        List<? extends GHCommit> commits = repo.queryCommits().author(getGithubName()).list().toList();
+        if (commits.size() < 2) {
+            return 0.0; // Need at least 2 commits for an interval
+        }
+
+        commits.sort(Comparator.comparing(GHCommit::getCommitDate));
+        long totalMillis = 0;
+        for (int i = 1; i < commits.size(); i++) {
+            long diff = commits.get(i).getCommitDate().getTime() - commits.get(i - 1).getCommitDate().getTime();
+            totalMillis += diff;
+        }
+        double avgMillis = totalMillis / (double)(commits.size() - 1);
+        return avgMillis / (1000.0 * 60 * 60); // Convert to hours
+    }
+
+    /**
+     * #4: Average Number of Open Issues Across Repos
+     * @return
+     * @throws IOException
+     */
+    public double getAverageOpenIssues() throws IOException {
+        List<GHRepository> repos = getRepos();
+        if (repos.isEmpty()) {
+            return 0.0;
+        }
+        int totalOpenIssues = 0;
+        for (GHRepository repo : repos) {
+            totalOpenIssues += repo.getIssues(GHIssueState.OPEN).size();
+        }
+        return totalOpenIssues / (double)repos.size();
+    }
+
+    /**
+     * #5: Average Time Pull Requests Stay Open
+     * @return
+     * @throws IOException
+     */
+    public double getAveragePullRequestDuration() throws IOException {
+        List<GHRepository> repos = getRepos();
+        List<GHPullRequestWrapper> allPRs = new ArrayList<>();
+        for (GHRepository repo : repos) {
+            for (GHPullRequest pr : repo.getPullRequests(GHIssueState.CLOSED)) {
+                allPRs.add(new GHPullRequestWrapper(pr));
+            }
+        }
+        if (allPRs.isEmpty()) {
+            return 0.0;
+        }
+        long totalHours = 0;
+        for (GHPullRequestWrapper pr : allPRs) {
+            long durationMillis = pr.getClosedAt().getTime() - pr.getCreatedAt().getTime();
+            totalHours += durationMillis / (1000 * 60 * 60);
+        }
+        return totalHours / (double)allPRs.size();
+    }
+
+    /**
+     * #6: Average Number of Collaborators Across Repos
+     * @return
+     * @throws IOException
+     */
+    public double getAverageCollaborators() throws IOException {
+        List<GHRepository> repos = getRepos();
+        if (repos.isEmpty()) {
+            return 0.0;
+        }
+        int totalCollaborators = 0;
+        for (GHRepository repo : repos) {
+            totalCollaborators += repo.listCollaborators().toList().size();
+        }
+        return totalCollaborators / (double)repos.size();
+    }
+}

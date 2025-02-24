@@ -2,10 +2,7 @@ package ca.ualberta.cs.cmput402.ghdow;
 
 import org.junit.jupiter.api.Test;
 import org.junit.runner.RunWith;
-import org.kohsuke.github.GHIssue;
-import org.kohsuke.github.GHIssueState;
-import org.kohsuke.github.GHRepository;
-import org.kohsuke.github.GitHub;
+import org.kohsuke.github.*;
 import org.mockito.MockedConstruction;
 import org.mockito.junit.MockitoJUnitRunner;
 
@@ -115,6 +112,161 @@ import static org.mockito.Mockito.*;
             assertEquals(expectedDates.get(i), actualDates.get(i));
             System.out.println(expectedDates.get(i));
         }
+    }
+
+    /**
+     * 2:
+     * @throws IOException
+     */
+    @Test
+    void testMostPopularMonth() throws IOException {
+        MyGithub my = new MyGithub("fakeToken");
+        my.gitHub = mock(GitHub.class);
+        List<GHCommit> mockCommits = new ArrayList<>();
+        Calendar cal = Calendar.getInstance();
+        cal.set(2025, Calendar.JANUARY, 1); mockCommits.add(mockCommitWithDate(cal.getTime()));
+        cal.set(2025, Calendar.JANUARY, 2); mockCommits.add(mockCommitWithDate(cal.getTime()));
+        cal.set(2025, Calendar.FEBRUARY, 1); mockCommits.add(mockCommitWithDate(cal.getTime()));
+        when(my.getCommits()).thenReturn(mockCommits);
+        assertEquals("January", my.getMostPopularMonth()); // 2 Jan vs 1 Feb
+    }
+    private GHCommit mockCommitWithDate(Date date) throws IOException {
+        GHCommit commit = mock(GHCommit.class);
+        when(commit.getCommitDate()).thenReturn(date);
+        return commit;
+    }
+
+
+    // #3: Average Time Between Commits
+    @Test
+    void testAverageCommitInterval() throws IOException {
+        MyGithub my = new MyGithub("fakeToken");
+        my.gitHub = mock(GitHub.class);
+        my.myRepos = new HashMap<>();
+
+        GHRepository repo = mock(GHRepository.class);
+        my.myRepos.put("testRepo", repo);
+
+        List<GHCommit> commits = new ArrayList<>();
+        Calendar cal = Calendar.getInstance();
+        cal.set(2025, Calendar.JANUARY, 1, 0, 0, 0); commits.add(mockCommitWithDate(cal.getTime()));
+        cal.set(2025, Calendar.JANUARY, 2, 0, 0, 0); commits.add(mockCommitWithDate(cal.getTime()));
+        cal.set(2025, Calendar.JANUARY, 4, 0, 0, 0); commits.add(mockCommitWithDate(cal.getTime()));
+
+        PagedIterable<GHCommit> pagedCommits = mock(PagedIterable.class);
+        when(pagedCommits.toList()).thenReturn(commits);
+        GHRepository.CommitQueryBuilder queryBuilder = mock(GHRepository.CommitQueryBuilder.class);
+        when(queryBuilder.author(anyString())).thenReturn(queryBuilder);
+        when(queryBuilder.list()).thenReturn(pagedCommits);
+        when(repo.queryCommits()).thenReturn(queryBuilder);
+
+        double avgHours = my.getAverageCommitInterval("testRepo");
+        assertEquals(48.0, avgHours, 0.01); // (24 + 72) / 2 = 48 hours
+
+        // Edge case: Single commit
+        when(pagedCommits.toList()).thenReturn(Collections.singletonList(mockCommitWithDate(new Date())));
+        assertEquals(0.0, my.getAverageCommitInterval("testRepo"), 0.01);
+    }
+
+    // #4: Average Number of Open Issues
+    @Test
+    void testAverageOpenIssues() throws IOException {
+        MyGithub my = new MyGithub("fakeToken");
+        my.gitHub = mock(GitHub.class);
+        my.myRepos = new HashMap<>();
+
+        GHRepository repo1 = mock(GHRepository.class);
+        GHRepository repo2 = mock(GHRepository.class);
+        my.myRepos.put("repo1", repo1);
+        my.myRepos.put("repo2", repo2);
+
+        List<GHIssue> issues1 = Arrays.asList(mock(GHIssue.class), mock(GHIssue.class));
+        List<GHIssue> issues2 = Collections.singletonList(mock(GHIssue.class));
+        when(repo1.getIssues(GHIssueState.OPEN)).thenReturn(issues1);
+        when(repo2.getIssues(GHIssueState.OPEN)).thenReturn(issues2);
+
+        double avgIssues = my.getAverageOpenIssues();
+        assertEquals(1.5, avgIssues, 0.01); // (2 + 1) / 2 = 1.5
+
+        // Edge case: No repos
+        my.myRepos.clear();
+        assertEquals(0.0, my.getAverageOpenIssues(), 0.01);
+    }
+
+    // #5: Average Pull Request Duration
+    @Test
+    void testAveragePullRequestDuration() throws IOException {
+        MyGithub my = new MyGithub("fakeToken");
+        my.gitHub = mock(GitHub.class);
+        my.myRepos = new HashMap<>();
+
+        GHRepository repo = mock(GHRepository.class);
+        my.myRepos.put("testRepo", repo);
+
+        List<GHPullRequest> prs = new ArrayList<>();
+        GHPullRequest pr1 = mock(GHPullRequest.class);
+        GHPullRequest pr2 = mock(GHPullRequest.class);
+        prs.add(pr1);
+        prs.add(pr2);
+        when(repo.getPullRequests(GHIssueState.CLOSED)).thenReturn(prs);
+
+        Calendar cal = Calendar.getInstance();
+        cal.set(2025, Calendar.JANUARY, 1, 0, 0, 0); Date open1 = cal.getTime();
+        cal.set(2025, Calendar.JANUARY, 2, 0, 0, 0); Date close1 = cal.getTime();
+        cal.set(2025, Calendar.JANUARY, 3, 0, 0, 0); Date open2 = cal.getTime();
+        cal.set(2025, Calendar.JANUARY, 6, 0, 0, 0); Date close2 = cal.getTime();
+
+        try (MockedConstruction<GHPullRequestWrapper> ignored = mockConstruction(
+                GHPullRequestWrapper.class,
+                (mock, context) -> {
+                    GHPullRequest pr = (GHPullRequest) context.arguments().get(0);
+                    if (pr == pr1) {
+                        when(mock.getCreatedAt()).thenReturn(open1);
+                        when(mock.getClosedAt()).thenReturn(close1);
+                    } else if (pr == pr2) {
+                        when(mock.getCreatedAt()).thenReturn(open2);
+                        when(mock.getClosedAt()).thenReturn(close2);
+                    }
+                }
+        )) {
+            double avgHours = my.getAveragePullRequestDuration();
+            assertEquals(60.0, avgHours, 0.01); // (24 + 96) / 2 = 60 hours
+        }
+
+        // Edge case: No PRs
+        when(repo.getPullRequests(GHIssueState.CLOSED)).thenReturn(Collections.emptyList());
+        try (MockedConstruction<GHPullRequestWrapper> ignored = mockConstruction(GHPullRequestWrapper.class)) {
+            assertEquals(0.0, my.getAveragePullRequestDuration(), 0.01);
+        }
+    }
+
+    // #6: Average Number of Collaborators
+    @Test
+    void testAverageCollaborators() throws IOException {
+        MyGithub my = new MyGithub("fakeToken");
+        my.gitHub = mock(GitHub.class);
+        my.myRepos = new HashMap<>();
+
+        GHRepository repo1 = mock(GHRepository.class);
+        GHRepository repo2 = mock(GHRepository.class);
+        my.myRepos.put("repo1", repo1);
+        my.myRepos.put("repo2", repo2);
+
+        List<GHUser> collab1 = Arrays.asList(mock(GHUser.class), mock(GHUser.class));
+        List<GHUser> collab2 = Collections.singletonList(mock(GHUser.class));
+        PagedIterable<GHUser> pagedCollab1 = mock(PagedIterable.class);
+        PagedIterable<GHUser> pagedCollab2 = mock(PagedIterable.class);
+        when(pagedCollab1.toList()).thenReturn(collab1);
+        when(pagedCollab2.toList()).thenReturn(collab2);
+        when(repo1.listCollaborators()).thenReturn(pagedCollab1);
+        when(repo2.listCollaborators()).thenReturn(pagedCollab2);
+
+        double avgCollabs = my.getAverageCollaborators();
+        assertEquals(1.5, avgCollabs, 0.01); // (2 + 1) / 2 = 1.5
+
+        // Edge case: No repos
+        my.myRepos.clear();
+        assertEquals(0.0, my.getAverageCollaborators(), 0.01);
     }
 }
 
