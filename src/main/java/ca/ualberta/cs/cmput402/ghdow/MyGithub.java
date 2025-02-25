@@ -199,7 +199,7 @@ public class MyGithub {
     }
 
     /**
-     * #6: Average Number of Collaborators Across Repos
+     * 6: Average Number of Collaborators Across Repos
      * @return
      * @throws IOException
      */
