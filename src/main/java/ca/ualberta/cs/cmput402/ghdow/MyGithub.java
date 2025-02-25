@@ -34,7 +34,7 @@ public class MyGithub {
         return new ArrayList<>(myRepos.values());
     }
 
-    static private int argMax(int[] days) {
+    public int argMax(int[] days) {
         int max = Integer.MIN_VALUE;
         int arg = -1;
         for (int i = 0; i < days.length; i++) {
@@ -46,7 +46,7 @@ public class MyGithub {
         return arg;
     }
 
-    static private String intToDay(int day) {
+    public String intToDay(int day) {
         return switch (day) {
             case Calendar.SUNDAY -> "Sunday";
             case Calendar.MONDAY -> "Monday";

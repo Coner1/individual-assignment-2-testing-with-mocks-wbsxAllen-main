@@ -142,7 +142,7 @@ public class MyGithubTest {
         GHCommitQueryBuilder queryBuilder = mock(GHCommitQueryBuilder.class);
         PagedIterable<GHCommit> pagedCommits = mock(PagedIterable.class);
         when(repo.queryCommits()).thenReturn(queryBuilder);
-        when(queryBuilder.author("tim")).thenReturn(queryBuilder); // Match getGithubName()
+        when(queryBuilder.author("tim")).thenReturn(queryBuilder);
         when(queryBuilder.list()).thenReturn(pagedCommits);
         when(queryBuilder.list().toList()).thenReturn(mockCommits);
 
@@ -210,7 +210,7 @@ public class MyGithubTest {
         when(repo2.getIssues(GHIssueState.OPEN)).thenReturn(issues2);
 
         double avgIssues = my.getAverageOpenIssues();
-        assertEquals(1.5, avgIssues, 0.01); // (2 + 1) / 2 = 1.5
+        assertEquals(1.5, avgIssues, 0.01);
 
         // Edge case: No repos
         my.myRepos.clear();
@@ -254,7 +254,7 @@ public class MyGithubTest {
                 }
         )) {
             double avgHours = my.getAveragePullRequestDuration();
-            assertEquals(24, avgHours, 0.01); // (24 + 96) / 2 = 60 hours
+            assertEquals(24, avgHours, 0.01);
         }
 
     }
@@ -281,11 +281,45 @@ public class MyGithubTest {
         when(repo2.listCollaborators()).thenReturn(pagedCollab2);
 
         double avgCollabs = my.getAverageCollaborators();
-        assertEquals(1.5, avgCollabs, 0.01); // (2 + 1) / 2 = 1.5
+        assertEquals(1.5, avgCollabs, 0.01);
 
         // Edge case: No repos
         my.myRepos.clear();
         assertEquals(0.0, my.getAverageCollaborators(), 0.01);
+    }
+
+    @Test
+    void testArgMaxNormalCase() throws IOException {
+        MyGithub my = new MyGithub("fakeToken");
+        int[] days = {0, 5, 2, 8, 3};
+        int result = my.argMax(days);
+        assertEquals(3, result, "Index of maximum value (8) should be 3");
+    }
+
+    @Test
+    void testArgMaxAllEqual() throws IOException {
+        MyGithub my = new MyGithub("fakeToken");
+        int[] days = {4, 4, 4, 4}; // All 4s, should return first index (0)
+        int result = my.argMax(days);
+        assertEquals(0, result, "With all equal values, should return index 0");
+    }
+
+    @Test
+    void testIntToDayValid() throws IOException {
+        MyGithub my = new MyGithub("fakeToken");
+        String result = my.intToDay(Calendar.TUESDAY);
+        assertEquals("Tuesday", result, "Day 3 should map to Tuesday");
+    }
+
+    @Test
+    void testIntToDayInvalid() throws IOException {
+        MyGithub my = new MyGithub("fakeToken");
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> my.intToDay(0), // 0 isn’t a valid Calendar day
+                "Expected IllegalArgumentException for invalid day"
+        );
+        assertEquals("Not a day: 0", exception.getMessage(), "Exception message should match");
     }
 }
 
