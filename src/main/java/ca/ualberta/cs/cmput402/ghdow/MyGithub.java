@@ -79,7 +79,7 @@ public class MyGithub {
             for (GHRepository repo: getRepos()) {
                 System.out.println("Loading commits: repo " + repo.getName());
                 try {
-                    for (GHCommit commit : repo.queryCommits().author(getGithubName()).list()) {
+                    for (GHCommit commit : repo.queryCommits().author(getGithubName()).list().toList()) {
                         myCommits.add(commit);
                         count++;
                         if (count % 100 == 0) {
@@ -107,7 +107,7 @@ public class MyGithub {
     }
 
     /**
-     * #2: Most popular commit month.
+     * 2: Most popular commit month.
      * @return
      * @throws IOException
      */
@@ -120,11 +120,11 @@ public class MyGithub {
             months[month]++;
         }
         int maxMonth = argMax(months);
-        return new DateFormatSymbols().getMonths()[maxMonth - 1]; // Convert to month name
+        return new DateFormatSymbols().getMonths()[maxMonth - 1];
     }
 
     /**
-     * #3: Average Time Between Commits on a Repository
+     * 3: Average Time Between Commits on a Repository
      * @param repoName
      * @return
      * @throws IOException
@@ -134,12 +134,20 @@ public class MyGithub {
         if (repo == null) {
             throw new IllegalArgumentException("Repository not found: " + repoName);
         }
-        List<? extends GHCommit> commits = repo.queryCommits().author(getGithubName()).list().toList();
+        String githubName = getGithubName();
+        List<? extends GHCommit> commits = repo.queryCommits().author(githubName).list().toList();
         if (commits.size() < 2) {
             return 0.0; // Need at least 2 commits for an interval
         }
+        commits.sort(Comparator.comparing((commit) -> {
+            try {
+                return commit.getCommitDate();
+            } catch (IOException e) {
+                return null;
+            }
+        }));
 
-        commits.sort(Comparator.comparing(GHCommit::getCommitDate));
+
         long totalMillis = 0;
         for (int i = 1; i < commits.size(); i++) {
             long diff = commits.get(i).getCommitDate().getTime() - commits.get(i - 1).getCommitDate().getTime();
@@ -150,7 +158,7 @@ public class MyGithub {
     }
 
     /**
-     * #4: Average Number of Open Issues Across Repos
+     * 4: Average Number of Open Issues Across Repos
      * @return
      * @throws IOException
      */

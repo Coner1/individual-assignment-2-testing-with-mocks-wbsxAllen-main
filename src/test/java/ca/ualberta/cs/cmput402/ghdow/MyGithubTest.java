@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.runner.RunWith;
 import org.kohsuke.github.*;
 import org.mockito.MockedConstruction;
+import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnitRunner;
 
 import java.io.IOException;
@@ -12,7 +13,8 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-@RunWith(MockitoJUnitRunner.class) class MyGithubTest {
+@RunWith(MockitoJUnitRunner.class)
+public class MyGithubTest {
     @Test
     void getIssueCreateDates() throws IOException {
         // We don't have a login token for github :(
@@ -124,10 +126,30 @@ import static org.mockito.Mockito.*;
         my.gitHub = mock(GitHub.class);
         List<GHCommit> mockCommits = new ArrayList<>();
         Calendar cal = Calendar.getInstance();
-        cal.set(2025, Calendar.JANUARY, 1); mockCommits.add(mockCommitWithDate(cal.getTime()));
-        cal.set(2025, Calendar.JANUARY, 2); mockCommits.add(mockCommitWithDate(cal.getTime()));
-        cal.set(2025, Calendar.FEBRUARY, 1); mockCommits.add(mockCommitWithDate(cal.getTime()));
-        when(my.getCommits()).thenReturn(mockCommits);
+        cal.set(2025, Calendar.JANUARY, 1);
+        mockCommits.add(mockCommitWithDate(cal.getTime()));
+        cal.set(2025, Calendar.JANUARY, 2);
+        mockCommits.add(mockCommitWithDate(cal.getTime()));
+        cal.set(2025, Calendar.FEBRUARY, 1);
+        mockCommits.add(mockCommitWithDate(cal.getTime()));
+//        when(my.getCommits()).thenReturn(mockCommits);
+        when(my.gitHub.getMyself()).thenReturn(mock(GHMyself.class));
+        when(my.gitHub.getMyself().getLogin()).thenReturn("tim");
+
+        Map<String, GHRepository> repoMap = new HashMap<>();
+        GHRepository repo = mock(GHRepository.class);
+
+        GHCommitQueryBuilder queryBuilder = mock(GHCommitQueryBuilder.class);
+        PagedIterable<GHCommit> pagedCommits = mock(PagedIterable.class);
+        when(repo.queryCommits()).thenReturn(queryBuilder);
+        when(queryBuilder.author("tim")).thenReturn(queryBuilder); // Match getGithubName()
+        when(queryBuilder.list()).thenReturn(pagedCommits);
+        when(queryBuilder.list().toList()).thenReturn(mockCommits);
+
+        repoMap.put("Assignment1", repo);
+        my.myself = mock(GHPerson.class);
+        when(my.myself.getRepositories()).thenReturn(repoMap);
+
         assertEquals("January", my.getMostPopularMonth()); // 2 Jan vs 1 Feb
     }
     private GHCommit mockCommitWithDate(Date date) throws IOException {
@@ -137,9 +159,9 @@ import static org.mockito.Mockito.*;
     }
 
 
-    // #3: Average Time Between Commits
+    // 3: Average Time Between Commits
     @Test
-    void testAverageCommitInterval() throws IOException {
+    public void testAverageCommitInterval() throws IOException {
         MyGithub my = new MyGithub("fakeToken");
         my.gitHub = mock(GitHub.class);
         my.myRepos = new HashMap<>();
@@ -149,21 +171,26 @@ import static org.mockito.Mockito.*;
 
         List<GHCommit> commits = new ArrayList<>();
         Calendar cal = Calendar.getInstance();
-        cal.set(2025, Calendar.JANUARY, 1, 0, 0, 0); commits.add(mockCommitWithDate(cal.getTime()));
-        cal.set(2025, Calendar.JANUARY, 2, 0, 0, 0); commits.add(mockCommitWithDate(cal.getTime()));
-        cal.set(2025, Calendar.JANUARY, 4, 0, 0, 0); commits.add(mockCommitWithDate(cal.getTime()));
+        cal.set(2025, Calendar.JANUARY, 1, 0, 0, 0);
+        commits.add(mockCommitWithDate(cal.getTime()));
+        cal.set(2025, Calendar.JANUARY, 2, 0, 0, 0);
+        commits.add(mockCommitWithDate(cal.getTime()));
+        cal.set(2025, Calendar.JANUARY, 4, 0, 0, 0);
+        commits.add(mockCommitWithDate(cal.getTime()));
 
         PagedIterable<GHCommit> pagedCommits = mock(PagedIterable.class);
         when(pagedCommits.toList()).thenReturn(commits);
-        GHRepository.CommitQueryBuilder queryBuilder = mock(GHRepository.CommitQueryBuilder.class);
+        GHCommitQueryBuilder queryBuilder = mock(GHCommitQueryBuilder.class);
         when(queryBuilder.author(anyString())).thenReturn(queryBuilder);
         when(queryBuilder.list()).thenReturn(pagedCommits);
         when(repo.queryCommits()).thenReturn(queryBuilder);
 
+        when(my.gitHub.getMyself()).thenReturn(mock(GHMyself.class));
+        when(my.gitHub.getMyself().getLogin()).thenReturn("tim");
         double avgHours = my.getAverageCommitInterval("testRepo");
         assertEquals(48.0, avgHours, 0.01); // (24 + 72) / 2 = 48 hours
 
-        // Edge case: Single commit
+        // Edge case
         when(pagedCommits.toList()).thenReturn(Collections.singletonList(mockCommitWithDate(new Date())));
         assertEquals(0.0, my.getAverageCommitInterval("testRepo"), 0.01);
     }
