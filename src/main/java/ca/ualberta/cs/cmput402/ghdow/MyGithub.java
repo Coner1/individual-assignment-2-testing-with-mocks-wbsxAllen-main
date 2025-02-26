@@ -73,7 +73,7 @@ public class MyGithub {
     }
 
     protected Iterable<? extends GHCommit> getCommits() throws IOException {
-        if (myCommits == null) {
+        if (myCommits == null || myCommits.isEmpty()) {
             myCommits = new ArrayList<>();
             int count = 0;
             for (GHRepository repo: getRepos()) {
@@ -87,9 +87,7 @@ public class MyGithub {
                         }
                     }
                 } catch (GHException e) {
-                    if (!e.getCause().getMessage().contains("Repository is empty")) {
                         throw e;
-                    }
                 }
             }
         }
