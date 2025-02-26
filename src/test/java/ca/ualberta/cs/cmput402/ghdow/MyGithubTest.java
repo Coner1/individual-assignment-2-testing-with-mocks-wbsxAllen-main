@@ -217,7 +217,7 @@ public class MyGithubTest {
         assertEquals(0.0, my.getAverageOpenIssues(), 0.01);
     }
 
-    // #5: Average Pull Request Duration
+    // 5: Average Pull Request Duration
     @Test
     void testAveragePullRequestDuration() throws IOException {
         MyGithub my = new MyGithub("fakeToken");
@@ -320,6 +320,41 @@ public class MyGithubTest {
                 "Expected IllegalArgumentException for invalid day"
         );
         assertEquals("Not a day: 0", exception.getMessage(), "Exception message should match");
+    }
+
+    @Test
+    void testGetMostPopularDayWithRobustnessRetryOnFailure() throws IOException {
+        MyGithub my = new MyGithub("fakeToken");
+        my.gitHub = mock(GitHub.class);
+        my.myRepos = new HashMap<>();
+
+        GHRepository repo = mock(GHRepository.class);
+        my.myRepos.put("testRepo", repo);
+        when(my.gitHub.getMyself()).thenReturn(mock(GHMyself.class));
+        when(my.gitHub.getMyself().getLogin()).thenReturn("tim");
+        List<GHCommit> commits = new ArrayList<>();
+        Calendar cal = Calendar.getInstance();
+        cal.set(2025, Calendar.JANUARY, 1, 0, 0, 0);
+        commits.add(mockCommitWithDate(cal.getTime()));
+        cal.set(2025, Calendar.JANUARY, 1, 0, 0, 0);
+        commits.add(mockCommitWithDate(cal.getTime()));
+        cal.set(2025, Calendar.JANUARY, 5, 0, 0, 0);
+        commits.add(mockCommitWithDate(cal.getTime()));
+
+        PagedIterable<GHCommit> pagedCommits = mock(PagedIterable.class);
+
+        GHCommitQueryBuilder queryBuilder = mock(GHCommitQueryBuilder.class);
+        when(queryBuilder.author(anyString())).thenReturn(queryBuilder);
+        when(queryBuilder.list()).thenReturn(pagedCommits);
+        when(repo.queryCommits()).thenReturn(queryBuilder);
+        when(pagedCommits.toList())
+                .thenThrow(new IOException("Fail 1"))
+                .thenThrow(new IOException("Fail 2"))
+                .thenReturn(commits);
+
+        String result = my.getMostPopularDayWithRobustness();
+        verify(my, times(3)).getCommits();
+        assertNotNull(result);
     }
 }
 

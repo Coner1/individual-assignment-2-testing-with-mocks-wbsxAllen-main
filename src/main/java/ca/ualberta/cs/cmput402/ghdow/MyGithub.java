@@ -214,4 +214,26 @@ public class MyGithub {
         }
         return totalCollaborators / (double)repos.size();
     }
+
+    public String getMostPopularDayWithRobustness() throws IOException {
+        int[] days = new int[8];
+        Calendar cal = Calendar.getInstance();
+        int attempts = 0;
+        while (attempts < 3) {
+            try {
+                for (GHCommit commit : getCommits()) {
+                    Date date = commit.getCommitDate();
+                    cal.setTime(date);
+                    days[cal.get(Calendar.DAY_OF_WEEK)]++;
+                }
+                return intToDay(argMax(days));
+            } catch (IOException e) {
+                attempts++;
+                if (attempts == 3) {
+                    throw new IOException("Failed after 3 attempts: " + e.getMessage());
+                }
+            }
+        }
+        return null;
+    }
 }
